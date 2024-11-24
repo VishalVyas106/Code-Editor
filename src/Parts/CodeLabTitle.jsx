@@ -14,8 +14,6 @@ const CodeLabTitle = () => {
     </div>
   );
 };
-
-
 export default CodeLabTitle;
 
 
