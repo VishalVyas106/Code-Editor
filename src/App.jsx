@@ -20,10 +20,8 @@ const LANGUAGE_VERSIONS = {
   python: "3.10.0",
   java: "15.0.2",
   c: "10.2.0",
-  // c: "11.2.0"
 };
 
- 
 const CODE_SNIPPETS = {
   javascript: `const name = 'Vyas Vishal';
 const age = 20;
@@ -46,15 +44,59 @@ print('Hello from CodeLab team!')`,
 
   c: `#include <stdio.h>
 
-    int main() {
+int main() {
     char name[] = "Vyas Vishal";
     int age = 20;
-    printf("Name: %s, Age: %d ", name, age);
+    printf("Name: %s, Age: %d\\n", name, age);
     printf("Hello from CodeLab team!");
     return 0;
 }`
 };
 
+const Notification = ({ type, message }) => (
+  <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-[90%] max-w-md">
+    <div className={`px-4 py-3 rounded-lg shadow-xl flex items-center space-x-3 ${
+      type === 'error' ? 'bg-red-500/90' : 'bg-emerald-500/90'
+    }`}>
+      {type === 'error' ? (
+        <AlertCircle className="w-5 h-5 flex-shrink-0" />
+      ) : (
+        <Check className="w-5 h-5 flex-shrink-0" />
+      )}
+      <span className="font-medium text-sm">{message}</span>
+    </div>
+  </div>
+);
+
+const MobileMenu = ({ onClose, onLanguageSelect, currentLanguage }) => (
+  <div className="fixed inset-0 bg-black/90 z-50 backdrop-blur-sm">
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b border-zinc-800">
+        <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-lg">
+          <X className="w-6 h-6" />
+        </button>
+      </div>
+      <div className="flex-1 p-4">
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium mb-4">Select Language</h3>
+          {Object.entries(LANGUAGE_VERSIONS).map(([lang, version]) => (
+            <button
+              key={lang}
+              onClick={() => {
+                onLanguageSelect(lang);
+                onClose();
+              }}
+              className="w-full flex items-center justify-between p-4 rounded-lg bg-zinc-900 hover:bg-zinc-800"
+            >
+              <span className="capitalize">{lang}</span>
+              <span className="text-zinc-400 text-sm">({version})</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 const CodeEditor = () => {
   const editorRef = useRef();
@@ -65,8 +107,6 @@ const CodeEditor = () => {
   const [isError, setIsError] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
-  const [fontSize, setFontSize] = useState(14);
-  const [theme, setTheme] = useState("vs-dark");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isOutputFullscreen, setIsOutputFullscreen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -90,22 +130,16 @@ const CodeEditor = () => {
     setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
   };
 
-  const onMount = (editor) => {
-    editorRef.current = editor;
-    editor.focus();
-  };
-
   const handleLanguageSelect = (lang) => {
     setLanguage(lang);
     setValue(CODE_SNIPPETS[lang]);
     setShowLanguageMenu(false);
-    setMobileMenuOpen(false);
     showNotification(`Switched to ${lang}`);
   };
 
-  const copyCode = () => {
+  const copyCode = async () => {
     if (!editorRef.current) return;
-    navigator.clipboard.writeText(editorRef.current.getValue());
+    await navigator.clipboard.writeText(editorRef.current.getValue());
     showNotification('Code copied to clipboard');
   };
 
@@ -125,9 +159,7 @@ const CodeEditor = () => {
     if (!editorRef.current) return;
     
     setIsLoading(true);
-    if (isMobile) {
-      setIsOutputFullscreen(true);
-    }
+    if (isMobile) setIsOutputFullscreen(true);
 
     try {
       const response = await fetch('https://emkc.org/api/v2/piston/execute', {
@@ -145,11 +177,10 @@ const CodeEditor = () => {
       setOutput(output);
       setIsError(!!data.run.stderr);
       
-      if (!data.run.stderr) {
-        showNotification('Code executed successfully');
-      } else {
-        showNotification('Execution failed', 'error');
-      }
+      showNotification(
+        data.run.stderr ? 'Execution failed' : 'Code executed successfully',
+        data.run.stderr ? 'error' : 'success'
+      );
     } catch (error) {
       setOutput(['Error executing code:', error.message]);
       setIsError(true);
@@ -159,65 +190,23 @@ const CodeEditor = () => {
     }
   };
 
-  const MobileMenu = () => (
-    <div className="fixed inset-0 bg-black/90 z-50 backdrop-blur-sm">
-      <div className="flex flex-col h-full">
-        <div className="p-4 border-b border-zinc-800">
-          <button 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="p-2 hover:bg-zinc-800 rounded-lg"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        <div className="flex-1 p-4">
-            
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium mb-4">Select Language</h3>
-            {Object.keys(LANGUAGE_VERSIONS).map((lang) => (
-              <button
-                key={lang}
-                onClick={() => handleLanguageSelect(lang)}
-                className="w-full flex items-center justify-between p-4 rounded-lg bg-zinc-900 hover:bg-zinc-800"
-              >
-                <span className="capitalize">{lang}</span>
-                <span className="text-zinc-400 text-sm">
-                  ({LANGUAGE_VERSIONS[lang]})
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && <MobileMenu />}
-
-      {/* Notification */}
-      {notification.show && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-[90%] max-w-md">
-          <div className={`px-4 py-3 rounded-lg shadow-xl flex items-center space-x-3 ${
-            notification.type === 'error' ? 'bg-red-500/90' : 'bg-emerald-500/90'
-          }`}>
-            {notification.type === 'error' ? (
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            ) : (
-              <Check className="w-5 h-5 flex-shrink-0" />
-            )}
-            <span className="font-medium text-sm">{notification.message}</span>
-          </div>
-        </div>
+      {isMobileMenuOpen && (
+        <MobileMenu 
+          onClose={() => setIsMobileMenuOpen(false)}
+          onLanguageSelect={handleLanguageSelect}
+          currentLanguage={language}
+        />
       )}
 
-      {/* Top Bar */}
+      {notification.show && (
+        <Notification type={notification.type} message={notification.message} />
+      )}
+
       <div className="border-b border-zinc-800 bg-black">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="md:hidden p-2 hover:bg-zinc-800 rounded-lg"
@@ -227,7 +216,6 @@ const CodeEditor = () => {
 
             <CodeLabTitle />
 
-            {/* Desktop Language Selector */}
             <div className="hidden md:block relative">
               <button
                 onClick={() => setShowLanguageMenu(!showLanguageMenu)}
@@ -240,31 +228,20 @@ const CodeEditor = () => {
               
               {showLanguageMenu && (
                 <div className="absolute top-full left-0 mt-2 w-48 bg-zinc-900 rounded-lg shadow-xl border border-zinc-800 z-50">
-                  {Object.keys(LANGUAGE_VERSIONS).map((lang) => (
+                  {Object.entries(LANGUAGE_VERSIONS).map(([lang, version]) => (
                     <button
                       key={lang}
                       onClick={() => handleLanguageSelect(lang)}
                       className="flex items-center w-full px-4 py-2 hover:bg-zinc-800 first:rounded-t-lg last:rounded-b-lg"
                     >
                       <span className="capitalize">{lang}</span>
-                      <span className="text-zinc-400 text-sm ml-2">
-                        ({LANGUAGE_VERSIONS[lang]})
-                      </span>
+                      <span className="text-zinc-400 text-sm ml-2">({version})</span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
           </div>
-
-
-
-
-
-
-
-
-
 
           <div className="flex items-center space-x-2 md:space-x-3">
             <button
@@ -285,9 +262,7 @@ const CodeEditor = () => {
               onClick={runCode}
               disabled={isLoading}
               className={`flex items-center space-x-2 px-4 md:px-6 py-2 rounded-lg font-medium transition-colors ${
-                isLoading 
-                  ? 'bg-zinc-700 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-500'
+                isLoading ? 'bg-zinc-700 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500'
               }`}
             >
               <Play className="w-4 h-4" />
@@ -297,21 +272,22 @@ const CodeEditor = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col md:flex-row">
-        {/* Editor */}
         <div className={`${
           isMobile && isOutputFullscreen ? 'hidden' : 'flex-1'
         } md:w-1/2 md:border-r border-zinc-800`}>
           <Editor
             height="calc(100vh - 4rem)"
-            theme={theme}
+            theme="vs-dark"
             language={language}
             value={value}
             onChange={setValue}
-            onMount={onMount}
+            onMount={(editor) => {
+              editorRef.current = editor;
+              editor.focus();
+            }}
             options={{
-              fontSize: fontSize,
+              fontSize: 14,
               minimap: { enabled: false },
               scrollbar: {
                 vertical: 'visible',
@@ -326,7 +302,6 @@ const CodeEditor = () => {
           />
         </div>
 
-        {/* Output */}
         <div className={`${
           isMobile && !isOutputFullscreen ? 'hidden' : 'flex-1'
         } md:w-1/2 flex flex-col bg-black`}>
@@ -377,9 +352,8 @@ const CodeEditor = () => {
         </div>
       </div>
 
-      {/* Footer */}
       <div className="border-t border-zinc-800 py-4 px-6 text-center text-zinc-500 text-sm">
-        © Copyright by CodeLab Club from Ampics and created by Vyas Vishal
+        © Copyright by CodeLab Club from Ampics 
       </div>
     </div>
   );
